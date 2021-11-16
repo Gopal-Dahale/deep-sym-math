@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from re import A
-from deep_math.data.sym_data_module import SymDataModule
+from deep_sym_math.data.sym_data_module import SymDataModule
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -23,14 +23,17 @@ def main():
     args = parser.parse_args()
     datasets = args.datasets
 
-    a = [[1, 2], [3, 4], [5, 6]]
-    x, y = zip(*a)
-    print(x)
-    print(y)
-
     data = SymDataModule(datasets)
     data.prepare_data()
     data.setup()
+
+    # it = data.train_dataloader()
+    # for (x1, len1), (x2, len2), nb_ops in it:
+    #     print(x1, x2, len1, len2, nb_ops)
+
+    # (x1, len1), (x2, len2), nb_ops = next(iter))
+    # print(x1)
+    # print(x2)
 
 
 if __name__ == "__main__":

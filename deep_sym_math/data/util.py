@@ -1,5 +1,6 @@
 from urllib.request import urlretrieve
 from tqdm import tqdm
+from deep_sym_math.constants import OPERATORS
 
 
 class TqdmUpTo(tqdm):

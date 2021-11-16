@@ -1,11 +1,14 @@
 from pathlib import Path
 import pytorch_lightning as pl
 import os
-from deep_math.data.util import download_url
-from deep_math.constants import SYM_URLS
+from deep_sym_math.data.util import download_url
+from deep_sym_math.constants import SYM_URLS, SPECIAL_WORDS, OPERATORS
 import io
 from torch.utils.data import DataLoader
-from deep_math.data.base_dataset import BaseDataset
+from deep_sym_math.data.base_dataset import BaseDataset
+from collections import OrderedDict
+import sympy as sp
+import torch
 
 # Define file paths
 DATA_DIR = Path(__file__).resolve().parents[2] / "datasets"
@@ -18,9 +21,53 @@ class SymDataModule(pl.LightningDataModule):
     def __init__(self, tasks):
         super().__init__()
         self.batch_size = 32
-        self.num_workers = 4  # Count of subprocesses to use for data loading
+        self.num_workers = 0  # Count of subprocesses to use for data loading
         self.tasks = tasks
-        self.max_elements = 1
+        self.max_elements = 2
+        self.int_base = 10
+
+        # Indices
+        self.eos_index = 0
+        self.pad_index = 1
+
+        # Symbols / Elements
+        self.operators = sorted(list(OPERATORS.keys()))
+        self.constants = ['pi', 'E']
+        self.variables = OrderedDict({
+            'x': sp.Symbol('x', real=True, nonzero=True),  # , positive=True
+            'y': sp.Symbol('y', real=True, nonzero=True),  # , positive=True
+            'z': sp.Symbol('z', real=True, nonzero=True),  # , positive=True
+            't': sp.Symbol('t', real=True, nonzero=True),  # , positive=True
+        })
+        self.coefficients = OrderedDict(
+            {f'a{i}': sp.Symbol(f'a{i}', real=True) for i in range(10)})
+        self.functions = OrderedDict({
+            'f': sp.Function('f', real=True, nonzero=True),
+            'g': sp.Function('g', real=True, nonzero=True),
+            'h': sp.Function('h', real=True, nonzero=True),
+        })
+        self.symbols = [
+            'I', 'INT+', 'INT-', 'INT', 'FLOAT', '-', '.', '10^', 'Y', "Y'",
+            "Y''"
+        ]
+        self.elements = [str(i) for i in range(abs(self.int_base))]
+
+        # Vocabulary
+        self.words = SPECIAL_WORDS + self.constants
+        self.words += list(self.variables.keys())
+        self.words += list(self.coefficients.keys())
+        self.words += self.operators + self.symbols + self.elements
+
+        self.id2word = {i: s for i, s in enumerate(self.words)}
+        self.word2id = {s: i for i, s in self.id2word.items()}
+        assert len(self.words) == len(set(self.words))
+
+        # Dataset
+        self.sym_math_dataset = {
+            'data_train': [],
+            'data_valid': [],
+            'data_test': []
+        }
 
     def prepare_data(self, *args, **kwargs) -> None:
 
@@ -36,12 +83,6 @@ class SymDataModule(pl.LightningDataModule):
                     processed_path):
                 _download_and_process_sym_dataset(task, raw_path,
                                                   processed_path)
-
-        self.sym_math_dataset = {
-            'data_train': [],
-            'data_valid': [],
-            'data_test': []
-        }
 
     def setup(self, stage=None):
         for split in ['train', 'valid', 'test']:
@@ -63,10 +104,8 @@ class SymDataModule(pl.LightningDataModule):
                 temp_dataset['answers'].extend([xy[1] for xy in data])
                 print(f"Loaded {len(data)} {split} examples for {task}")
 
-            self.sym_math_dataset['data_train'] = BaseDataset(
+            self.sym_math_dataset['data_' + split] = BaseDataset(
                 temp_dataset['questions'], temp_dataset['answers'])
-
-        x, y = next(iter(self.train_dataloader()))
 
     def train_dataloader(self):
         return DataLoader(
@@ -98,12 +137,44 @@ class SymDataModule(pl.LightningDataModule):
             pin_memory=True,
         )
 
-    def collate_fn(self, elements):
+    def collate_fn(self, batch):
         """
-        Collate samples into a batch.
+        Collate function for pytorch dataloader.
         """
-        print(elements)
-        return elements
+        x, y = zip(*batch)
+        print(x)
+        print(y)
+        nb_ops = [
+            sum(int(word in OPERATORS) for word in seq.split()) for seq in x
+        ]
+        x = [self.encode_seq(seq) for seq in x]
+        y = [self.encode_seq(seq) for seq in y]
+        x, len_x = self.batch_sequences(x)
+        y, len_y = self.batch_sequences(y)
+
+        return (x, len_x), (y, len_y), torch.LongTensor(nb_ops)
+
+    def encode_seq(self, seq):
+        return torch.LongTensor(
+            [self.word2id[w] for w in seq if w in self.word2id])
+
+    def batch_sequences(self, sequences):
+        """
+        Take as input a list of n sequences (torch.LongTensor vectors) and return
+        a tensor of size (slen, n) where slen is the length of the longest
+        sentence, and a vector lengths containing the length of each sentence.
+        """
+        lengths = torch.LongTensor([2 + len(s) for s in sequences])
+        sent = torch.LongTensor(lengths.max().item(),
+                                lengths.size(0)).fill_(self.pad_index)
+        assert lengths.min().item() > 2
+
+        sent[0] = self.eos_index
+        for i, s in enumerate(sequences):
+            sent[1:lengths[i] - 1, i].copy_(s)
+            sent[lengths[i] - 1, i] = self.eos_index
+
+        return sent, lengths
 
 
 def _download_and_process_sym_dataset(task, raw_path, processed_path):
