@@ -21,7 +21,7 @@ class SymDataModule(pl.LightningDataModule):
     def __init__(self, tasks, max_elements=2):
         super().__init__()
         self.batch_size = 32
-        self.num_workers = 2  # Count of subprocesses to use for data loading
+        self.num_workers = 0  # Count of subprocesses to use for data loading
         self.tasks = tasks
         self.max_elements = max_elements
         self.int_base = 10
