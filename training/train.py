@@ -19,15 +19,21 @@ def _setup_parser():
         default=['prim_fwd'],
         choices=['prim_fwd', 'prim_bwd', 'prim_ibp', 'ode1', 'ode2'])
     parser.add_argument("--load_checkpoint", type=str, default=None)
+    parser.add_argument("--num-epochs", type=int, default=5)
+    parser.add_argument("--max-elements", type=int, default=2)
+    parser.add_argument("--fast-dev-run", type=bool, default=False)
     return parser
 
 
 def main():
     parser = _setup_parser()
     args = parser.parse_args()
+    num_epochs = args.num_epochs
+    max_elements = args.max_elements
+    fast_dev_run = args.fast_dev_run
     datasets = args.datasets
 
-    data = SymDataModule(datasets)
+    data = SymDataModule(datasets, max_elements)
     model = TransformerModel(data.data_config())
 
     lit_model_class = BaseLitModel
@@ -53,8 +59,8 @@ def main():
     logger.watch(model)
     callbacks = [early_stopping_callback, model_checkpoint_callback]
     trainer = pl.Trainer(gpus=gpus,
-                         fast_dev_run=False,
-                         max_epochs=5,
+                         fast_dev_run=fast_dev_run,
+                         max_epochs=num_epochs,
                          callbacks=callbacks,
                          logger=logger,
                          weights_save_path='training/logs',
