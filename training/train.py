@@ -22,6 +22,8 @@ def _setup_parser():
     parser.add_argument("--num-epochs", type=int, default=5)
     parser.add_argument("--max-elements", type=int, default=2)
     parser.add_argument("--fast-dev-run", type=bool, default=False)
+    parser.add_argument('--n_enc_layers', type=int, default=6)
+    parser.add_argument('--n_dec_layers', type=int, default=6)
     return parser
 
 
@@ -31,10 +33,15 @@ def main():
     num_epochs = args.num_epochs
     max_elements = args.max_elements
     fast_dev_run = args.fast_dev_run
+    n_enc_layers = args.n_enc_layers
+    n_dec_layers = args.n_dec_layers
     datasets = args.datasets
 
     data = SymDataModule(datasets, max_elements)
-    model = TransformerModel(data.data_config())
+    model = TransformerModel(data.data_config(), {
+        'n_enc_layers': n_enc_layers,
+        'n_dec_layers': n_dec_layers
+    })
 
     lit_model_class = BaseLitModel
     if args.load_checkpoint is not None:

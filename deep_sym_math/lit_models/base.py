@@ -112,10 +112,10 @@ class BaseLitModel(pl.LightningModule):
         (x, len_x), (y, len_y), nb_ops = batch
 
         # Target words to predict
-        alen = torch.arange(len_y.max(), dtype=torch.long)
+        alen = torch.arange(len_y.max(), dtype=torch.long).type_as(x)
 
         # Do not predict anything given the last target word
-        pred_mask = alen[:, None] < len_y[None] - 1
+        pred_mask = alen[:, None].type_as(alen) < len_y[None] - 1
 
         y_masked = y[1:].masked_select(pred_mask[:-1])
         assert len(y_masked) == (len_y - 1).sum().item()
