@@ -144,7 +144,8 @@ class TransformerModel(nn.Module):
 
         # Generate masks
         mask, attn_mask = get_masks(slen, len_y, True)
-        src_mask = torch.arange(len_x.max(), dtype=torch.long).type_as(len_x) < len_x[:, None]
+        src_mask = torch.arange(
+            len_x.max(), dtype=torch.long).type_as(len_x) < len_x[:, None]
 
         # Positions
         positions = y.new(slen).long()
