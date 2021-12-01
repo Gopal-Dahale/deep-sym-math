@@ -26,10 +26,6 @@ class SymDataModule(pl.LightningDataModule):
         self.max_elements = 2
         self.int_base = 10
 
-        # Indices
-        self.eos_index = 0
-        self.pad_index = 1
-
         # Symbols / Elements
         self.operators = sorted(list(OPERATORS.keys()))
         self.constants = ['pi', 'E']
@@ -57,16 +53,28 @@ class SymDataModule(pl.LightningDataModule):
         self.words += list(self.variables.keys())
         self.words += list(self.coefficients.keys())
         self.words += self.operators + self.symbols + self.elements
-
         self.id2word = {i: s for i, s in enumerate(self.words)}
         self.word2id = {s: i for i, s in self.id2word.items()}
         assert len(self.words) == len(set(self.words))
+
+        # Indices
+        self.n_words = len(self.words)
+        self.eos_index = 0
+        self.pad_index = 1
 
         # Dataset
         self.sym_math_dataset = {
             'data_train': [],
             'data_valid': [],
             'data_test': []
+        }
+
+    def data_config(self):
+        return {
+            'n_words': self.n_words,
+            'eos_index': self.eos_index,
+            'pad_index': self.pad_index,
+            'id2word': self.id2word,
         }
 
     def prepare_data(self, *args, **kwargs) -> None:
@@ -102,7 +110,6 @@ class SymDataModule(pl.LightningDataModule):
                 data = [xy for xy in data if len(xy) == 2]
                 temp_dataset['questions'].extend([xy[0] for xy in data])
                 temp_dataset['answers'].extend([xy[1] for xy in data])
-                print(f"Loaded {len(data)} {split} examples for {task}")
 
             self.sym_math_dataset['data_' + split] = BaseDataset(
                 temp_dataset['questions'], temp_dataset['answers'])
@@ -119,7 +126,7 @@ class SymDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(
-            self.sym_math_dataset['data_val'],
+            self.sym_math_dataset['data_valid'],
             shuffle=False,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
@@ -142,8 +149,6 @@ class SymDataModule(pl.LightningDataModule):
         Collate function for pytorch dataloader.
         """
         x, y = zip(*batch)
-        print(x)
-        print(y)
         nb_ops = [
             sum(int(word in OPERATORS) for word in seq.split()) for seq in x
         ]
