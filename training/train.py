@@ -5,6 +5,7 @@ from deep_sym_math.models.transformer import TransformerModel
 from deep_sym_math.lit_models.base import BaseLitModel
 import torch
 import pytorch_lightning as pl
+import wandb
 
 warnings.filterwarnings('ignore')
 
@@ -48,11 +49,14 @@ def main():
         monitor="val_loss",
         mode="min")
 
+    logger = pl.loggers.WandbLogger()
+    logger.watch(model)
     callbacks = [early_stopping_callback, model_checkpoint_callback]
     trainer = pl.Trainer(gpus=gpus,
                          fast_dev_run=False,
                          max_epochs=5,
                          callbacks=callbacks,
+                         logger=logger,
                          weights_save_path='training/logs',
                          weights_summary='full')
 
