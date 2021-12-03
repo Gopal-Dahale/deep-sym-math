@@ -80,6 +80,8 @@ class BaseLitModel(pl.LightningModule):
 
         # Forward / Loss
         logits = self.model(x, len_x, y, len_y)
+        print("LOGITS SHAPE", logits.shape)
+
         _, train_loss = self.loss_fn(logits, y_masked, pred_mask)
         self.log("train_loss", train_loss, on_step=False, on_epoch=True)
         return train_loss
@@ -132,9 +134,13 @@ class BaseLitModel(pl.LightningModule):
         self.log("test_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
 
     def loss_fn(self, logits, y, pred_mask):
+        print("LOSS FUNCTION")
         x = logits[pred_mask.unsqueeze(-1).expand_as(logits)].view(
             -1, self.model.dim)
+        print("X SHAPE", x.shape)
+        print("Y SHAPE", y.shape)
         assert (y == self.model.pad_index).sum().item() == 0
         scores = self.model.dec_proj(x).view(-1, self.model.n_words)
+        print("SCORES SHAPE", scores.shape)
         loss = F.cross_entropy(scores, y, reduction='mean')
         return scores, loss

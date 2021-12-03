@@ -62,16 +62,17 @@ def main():
         monitor="val_loss",
         mode="min")
 
-    logger = pl.loggers.WandbLogger()
-    logger.watch(model)
+    # logger = pl.loggers.WandbLogger()
+    # logger.watch(model)
     callbacks = [early_stopping_callback, model_checkpoint_callback]
-    trainer = pl.Trainer(gpus=gpus,
-                         fast_dev_run=fast_dev_run,
-                         max_epochs=num_epochs,
-                         callbacks=callbacks,
-                         logger=logger,
-                         weights_save_path='training/logs',
-                         weights_summary='full')
+    trainer = pl.Trainer(
+        gpus=gpus,
+        fast_dev_run=fast_dev_run,
+        max_epochs=num_epochs,
+        callbacks=callbacks,
+        #  logger=logger,
+        weights_save_path='training/logs',
+        weights_summary='full')
 
     trainer.tune(
         model=lit_model,
@@ -79,7 +80,7 @@ def main():
     )
 
     trainer.fit(model=lit_model, datamodule=data)
-    trainer.test(model=lit_model, datamodule=data)
+    # trainer.test(model=lit_model, datamodule=data)
 
 
 if __name__ == "__main__":

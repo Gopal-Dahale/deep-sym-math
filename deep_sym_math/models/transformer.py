@@ -97,10 +97,12 @@ class TransformerModel(nn.Module):
         self.dec_proj.weight = self.embeddings.weight
 
     def encode(self, x, len_x):
+        print("ENCODER")
         slen, bs = x.size()
         assert len_x.size(0) == bs
         assert len_x.max().item() <= slen
         x = x.transpose(0, 1)  # Batch size as dimension 0
+        print("X SHAPE TRANSPOSED", x.shape)
 
         # Generate masks
         mask, attn_mask = get_masks(slen, len_x, False)
@@ -111,34 +113,47 @@ class TransformerModel(nn.Module):
 
         # Embeddings
         tensor = self.embeddings(x)
+        print("TENSOR SHAPE AFTER EMBEDDING", tensor.shape)
         tensor = tensor + self.position_embeddings(positions).expand_as(tensor)
+        print("TENSOR SHAPE AFTER ADDING POSITION EMBEDDING", tensor.shape)
         tensor = self.enc_layer_norm_emb(tensor)
+        print("TENSOR SHAPE AFTER EMBEDDING LAYER NORM", tensor.shape)
         tensor = F.dropout(tensor, p=self.dropout)
+        print("TENSOR SHAPE AFTER DROPOUT", tensor.shape)
         tensor *= mask.unsqueeze(-1).to(tensor.dtype)
+        print("TENSOR SHAPE AFTER MASK", tensor.shape)
 
         # Transformer layers
         for i in range(self.n_enc_layers):
             # Self attention
             attn = self.enc_attentions[i](tensor, attn_mask)
             attn = F.dropout(attn, p=self.dropout)
+            print("ATTN SHAPE AFTER SELF ATTENTION", attn.shape)
             tensor = tensor + attn
+            print("TENSOR SHAPE AFTER ADDING ATTENTION", tensor.shape)
             tensor = self.enc_layer_norm1[i](tensor)
+            print("TENSOR SHAPE AFTER ENC LAYER NORM 1", tensor.shape)
 
             # FFN
             tensor = tensor + self.enc_ffns[i](tensor)
+            print("TENSOR SHAPE AFTER FFN", tensor.shape)
             tensor = self.enc_layer_norm2[i](tensor)
-
+            print("TENSOR SHAPE AFTER ENC LAYER NORM 2", tensor.shape)
             tensor *= mask.unsqueeze(-1).to(tensor.dtype)
+            print("TENSOR SHAPE AFTER MASK", tensor.shape)
 
         # Move back sequence length to dimension 0
         tensor = tensor.transpose(0, 1)
+        print("TENSOR SHAPE AFTER TRANSFORMER LAYERS", tensor.shape)
         return tensor
 
     def decode(self, x, len_x, y, len_y):
+        print("DECODER")
         slen, bs = y.size()
         assert len_y.size(0) == bs
         assert len_y.max().item() <= slen
         y = y.transpose(0, 1)
+        print("Y SHAPE TRANSPOSED", y.shape)
 
         x.size(0) == bs
 
@@ -153,36 +168,55 @@ class TransformerModel(nn.Module):
 
         # Embeddings
         tensor = self.embeddings(y)
+        print("TENSOR SHAPE AFTER EMBEDDING", tensor.shape)
         tensor = tensor + self.position_embeddings(positions).expand_as(tensor)
+        print("TENSOR SHAPE AFTER ADDING POSITION EMBEDDING", tensor.shape)
         tensor = self.dec_layer_norm_emb(tensor)
+        print("TENSOR SHAPE AFTER EMBEDDING LAYER NORM", tensor.shape)
         tensor = F.dropout(tensor, p=self.dropout)
+        print("TENSOR SHAPE AFTER DROPOUT", tensor.shape)
         tensor *= mask.unsqueeze(-1).to(tensor.dtype)
+        print("TENSOR SHAPE AFTER MASK", tensor.shape)
 
         # Transformer layers
         for i in range(self.n_dec_layers):
             # Self attention
             attn = self.dec_attentions[i](tensor, attn_mask)
             attn = F.dropout(attn, p=self.dropout)
+            print("ATTN SHAPE AFTER SELF ATTENTION", attn.shape)
             tensor = tensor + attn
+            print("TENSOR SHAPE AFTER ADDING ATTENTION", tensor.shape)
             tensor = self.dec_layer_norm1[i](tensor)
+            print("TENSOR SHAPE AFTER DEC LAYER NORM 1", tensor.shape)
 
             # Encoder attention (for decoder only)
             attn = self.dec_encoder_attn[i](tensor, src_mask, kv=x)
+            print("ATTN SHAPE AFTER ENCODER ATTENTION", attn.shape)
             attn = F.dropout(attn, p=self.dropout)
+            print("ATTN SHAPE AFTER DROPOUT", attn.shape)
             tensor = tensor + attn
+            print("TENSOR SHAPE AFTER ADDING ENCODER ATTENTION", tensor.shape)
             tensor = self.dec_layer_norm15[i](tensor)
+            print("TENSOR SHAPE AFTER DEC LAYER NORM 15", tensor.shape)
 
             # FFN
             tensor = tensor + self.dec_ffns[i](tensor)
+            print("TENSOR SHAPE AFTER FFN", tensor.shape)
             tensor = self.dec_layer_norm2[i](tensor)
+            print("TENSOR SHAPE AFTER DEC LAYER NORM 2", tensor.shape)
 
             tensor *= mask.unsqueeze(-1).to(tensor.dtype)
+            print("TENSOR SHAPE AFTER MASK", tensor.shape)
 
         # Move back sequence length to dimension 0
         tensor = tensor.transpose(0, 1)
+        print("TENSOR SHAPE AFTER TRANSFORMER LAYERS", tensor.shape)
         return tensor
 
     def forward(self, x, len_x, y, len_y):
+        print("BEFORE ENCODING")
+        print("X SHAPE", x.shape)
+        print("Y SHAPE", y.shape)
         x = self.encode(x, len_x)
         output = self.decode(x.transpose(0, 1), len_x, y, len_y)
         return output
