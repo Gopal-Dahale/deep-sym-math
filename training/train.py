@@ -22,8 +22,11 @@ def _setup_parser():
     parser.add_argument("--num-epochs", type=int, default=5)
     parser.add_argument("--max-elements", type=int, default=2)
     parser.add_argument("--fast-dev-run", type=bool, default=False)
-    parser.add_argument('--n_enc_layers', type=int, default=6)
-    parser.add_argument('--n_dec_layers', type=int, default=6)
+    parser.add_argument('--n_enc_layers', type=int, default=1)
+    parser.add_argument('--n_dec_layers', type=int, default=1)
+    parser.add_argument('--weights_save_path',
+                        type=str,
+                        default='training/logs')
     return parser
 
 
@@ -54,16 +57,20 @@ def main():
     if torch.cuda.is_available():
         gpus = -1  # all available GPUs
 
-    early_stopping_callback = pl.callbacks.EarlyStopping(monitor="val_loss",
+    early_stopping_callback = pl.callbacks.EarlyStopping(monitor="train_loss",
                                                          mode="min",
                                                          patience=10)
     model_checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        filename="{epoch:03d}-{val_loss:.3f}-{val_cer:.3f}",
-        monitor="val_loss",
+        filename=
+        "{epoch:03d}-{val_loss:.3f}-{train_loss:.3f}-{val_acc:.3f}-{train_acc:.3f}",
+        every_n_epochs=1,
+        save_top_k=2,
+        monitor="train_loss",
         mode="min")
 
     logger = pl.loggers.WandbLogger()
     logger.watch(model)
+
     callbacks = [early_stopping_callback, model_checkpoint_callback]
     trainer = pl.Trainer(gpus=gpus,
                          fast_dev_run=fast_dev_run,
@@ -80,6 +87,12 @@ def main():
 
     trainer.fit(model=lit_model, datamodule=data)
     trainer.test(model=lit_model, datamodule=data)
+
+    best_model_path = model_checkpoint_callback.best_model_path
+    if best_model_path:
+        print("Best model saved at:", best_model_path)
+        wandb.save(best_model_path)
+        print("Best model also uploaded to W&B")
 
 
 if __name__ == "__main__":
